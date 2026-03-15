@@ -86,23 +86,79 @@ library ieee;
   use ieee.numeric_std.all;
  
 entity thunderbird_fsm is 
---  port(
-	
---  );
+    port (
+        i_clk, i_reset  : in    std_logic;
+        i_left, i_right : in    std_logic;
+        o_lights_L      : out   std_logic_vector(2 downto 0);
+        o_lights_R      : out   std_logic_vector(2 downto 0)
+    );
 end thunderbird_fsm;
 
 architecture thunderbird_fsm_arch of thunderbird_fsm is 
 
 -- CONSTANTS ------------------------------------------------------------------
-  
+    subtype sm_state is std_logic_vector(2 downto 0);
+    constant k_OFF : sm_state := "000";
+    constant k_ON  : sm_state := "001";
+    constant k_L1  : sm_state := "010";
+    constant k_L2  : sm_state := "011";
+    constant k_L3  : sm_state := "100";
+    constant k_R1  : sm_state := "101";
+    constant k_R2  : sm_state := "110";
+    constant k_R3  : sm_state := "111";
+
+    signal f_S, f_S_next : sm_state := k_OFF;
+
 begin
 
 	-- CONCURRENT STATEMENTS --------------------------------------------------------	
+    with f_S select
+        o_lights_L <= "000" when k_OFF,
+                      "111" when k_ON,
+                      "001" when k_L1,
+                      "011" when k_L2,
+                      "111" when k_L3,
+                      "000" when others;
+
+    with f_S select
+        o_lights_R <= "000" when k_OFF,
+                      "111" when k_ON,
+                      "001" when k_R1,
+                      "011" when k_R2,
+                      "111" when k_R3,
+                      "000" when others;
 	
-    ---------------------------------------------------------------------------------
-	
-	-- PROCESSES --------------------------------------------------------------------
+	-- PROCESSES --------------------------------------------------------------------					   
+    register_proc : process(i_clk)
+    begin
+        if rising_edge(i_clk) then
+            if i_reset = '1' then
+                f_S <= k_OFF;
+            else
+                f_S <= f_S_next;
+            end if;
+        end if;
+    end process register_proc;
+
+    next_state_proc : process(f_S, i_left, i_right)
+    begin
+        case f_S is
+            when k_OFF =>
+                if (i_left = '1' and i_right = '1') then f_S_next <= k_ON;
+                elsif (i_left = '1') then f_S_next <= k_L1;
+                elsif (i_right = '1') then f_S_next <= k_R1;
+                else f_S_next <= k_OFF;
+                end if;
+            when k_ON => f_S_next <= k_OFF;
+            when k_L1 => f_S_next <= k_L2;
+            when k_L2 => f_S_next <= k_L3;
+            when k_L3 => f_S_next <= k_OFF;
+            when k_R1 => f_S_next <= k_R2;
+            when k_R2 => f_S_next <= k_R3;
+            when k_R3 => f_S_next <= k_OFF;
+            when others => f_S_next <= k_OFF;
+        end case;
+    end process next_state_proc;
     
-	-----------------------------------------------------					   
-				  
+    
 end thunderbird_fsm_arch;
